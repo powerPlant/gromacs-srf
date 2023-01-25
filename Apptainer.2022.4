@@ -1,0 +1,43 @@
+Bootstrap: docker
+From: ubuntu:jammy
+
+%labels
+Maintainer ben.warren@plantandfood.co.nz
+Version 2022.4
+
+%post
+  export DEBIAN_FRONTEND=noninteractive 
+  cd /tmp
+  ## Download build prerequisites
+  apt-get update
+  apt-get -y install cmake gcc-12 g++-12 curl
+
+  # install CUDA 12.0
+  curl -sLO https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
+  dpkg -i cuda-keyring_1.0-1_all.deb && \
+  apt-get update && \
+  apt-get -y install cuda
+  
+  ## Build gromacs 
+  curl -sL ftp://ftp.gromacs.org/pub/gromacs/gromacs-2022.4.tar.gz | tar xz
+  cd gromacs-2022.4
+  mkdir build
+  cd build
+  cmake .. -DGMX_BUILD_OWN_FFTW=ON -DGMX_GPU=CUDA -DGMX_FFT_LIBRARY=fftw3
+  make -j 4
+  make install
+  
+  ## Cleanup
+  cd /tmp
+  export SUDO_FORCE_REMOVE=yes
+  rm -rf /tmp/gromacs*
+  apt-get -y remove --purge cmake gcc g++ curl
+  apt-get -y clean all
+  apt-get -y autoremove --purge
+
+  ## Reinstall libogmp and cuda
+  apt-get -y install libgomp1 cuda
+
+%runscript
+  . /usr/local/gromacs/bin/GMXRC.bash
+  gmx "$@"
